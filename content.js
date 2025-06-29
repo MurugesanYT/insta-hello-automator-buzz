@@ -1,105 +1,119 @@
 
-// Instagram Auto-Reply Extension - Guaranteed Working Version
+// Instagram Auto-Reply Extension - BULLETPROOF VERSION
 (function() {
     'use strict';
     
-    let isActive = false;
+    console.log('🚀 BULLETPROOF Instagram Auto-Reply Loading...');
+    
     let personalMessage = '';
-    let lastProcessedMessage = '';
-    let messageCount = 0;
+    let isProcessing = false;
+    let messagesSent = 0;
+    let observer = null;
     
-    console.log('🚀 Instagram Auto-Reply Extension Loading...');
-    
-    // Initialize extension
-    function init() {
-        loadSettings();
-        startMessageMonitoring();
-        showActiveIndicator();
-        console.log('✅ Extension initialized and active');
-    }
-    
-    // Load settings from storage
+    // Load settings immediately
     function loadSettings() {
         chrome.storage.local.get(['personalDescription'], (result) => {
             personalMessage = result.personalDescription || "Hi! I'm excited to connect with you. I'm passionate about building meaningful connections and would love to learn more about what you do. Looking forward to our conversation!";
-            console.log('📝 Loaded message:', personalMessage);
+            console.log('✅ Message loaded:', personalMessage);
         });
     }
     
-    // Show visual indicator that extension is active
-    function showActiveIndicator() {
-        const indicator = document.createElement('div');
-        indicator.id = 'auto-reply-active';
-        indicator.innerHTML = '🤖 AUTO-REPLY ON';
-        indicator.style.cssText = `
+    // Initialize everything
+    function init() {
+        loadSettings();
+        setupMessageObserver();
+        startContinuousMonitoring();
+        showStatus('🤖 AUTO-REPLY ACTIVE');
+        console.log('✅ Extension fully initialized');
+    }
+    
+    // Show status indicator
+    function showStatus(message) {
+        const existing = document.getElementById('auto-reply-status');
+        if (existing) existing.remove();
+        
+        const status = document.createElement('div');
+        status.id = 'auto-reply-status';
+        status.textContent = message;
+        status.style.cssText = `
             position: fixed !important;
             top: 20px !important;
             right: 20px !important;
             background: #00ff00 !important;
             color: #000 !important;
-            padding: 8px 15px !important;
+            padding: 10px 20px !important;
             border-radius: 25px !important;
             font-weight: bold !important;
-            font-size: 12px !important;
+            font-size: 14px !important;
             z-index: 999999 !important;
-            box-shadow: 0 4px 15px rgba(0,255,0,0.3) !important;
-            animation: pulse 2s infinite !important;
+            box-shadow: 0 4px 15px rgba(0,255,0,0.5) !important;
         `;
+        document.body.appendChild(status);
         
-        document.body.appendChild(indicator);
-        
-        // Remove after 8 seconds
-        setTimeout(() => {
-            if (indicator.parentNode) {
-                indicator.remove();
-            }
-        }, 8000);
+        setTimeout(() => status.remove(), 5000);
     }
     
-    // Start monitoring for messages
-    function startMessageMonitoring() {
-        console.log('👁️ Starting message monitoring...');
+    // Setup mutation observer for real-time message detection
+    function setupMessageObserver() {
+        if (observer) observer.disconnect();
         
-        // Monitor for new messages every 2 seconds
+        observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.addedNodes.length > 0) {
+                    setTimeout(() => checkForHelloAndRespond(), 500);
+                }
+            });
+        });
+        
+        const targetNode = document.body;
+        observer.observe(targetNode, {
+            childList: true,
+            subtree: true,
+            characterData: true
+        });
+    }
+    
+    // Continuous monitoring every 2 seconds
+    function startContinuousMonitoring() {
         setInterval(() => {
             if (window.location.href.includes('/direct/')) {
-                checkForHelloMessage();
+                checkForHelloAndRespond();
             }
         }, 2000);
-        
-        // Also monitor for send button clicks
-        document.addEventListener('click', (e) => {
-            if (e.target.closest('button') && window.location.href.includes('/direct/')) {
-                setTimeout(() => checkForHelloMessage(), 3000);
-            }
-        }, true);
-        
-        // Monitor for Enter key presses
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && window.location.href.includes('/direct/')) {
-                setTimeout(() => checkForHelloMessage(), 3000);
-            }
-        }, true);
     }
     
-    // Check for Hello messages
-    function checkForHelloMessage() {
+    // Main function to check for Hello and respond
+    function checkForHelloAndRespond() {
+        if (isProcessing) return;
+        
         console.log('🔍 Checking for Hello messages...');
         
-        // Find all message elements
-        const messageElements = document.querySelectorAll('div[dir="auto"]');
+        // Find all possible message containers
+        const messageSelectors = [
+            'div[dir="auto"]',
+            '[data-testid*="message"]',
+            '.x1n2onr6',
+            'div[role="gridcell"] div',
+            'span[dir="auto"]'
+        ];
         
-        for (let i = messageElements.length - 1; i >= Math.max(0, messageElements.length - 10); i--) {
-            const element = messageElements[i];
-            const text = element.textContent?.trim();
+        let allMessages = [];
+        messageSelectors.forEach(selector => {
+            const elements = document.querySelectorAll(selector);
+            allMessages = [...allMessages, ...Array.from(elements)];
+        });
+        
+        // Check recent messages (last 10)
+        const recentMessages = allMessages.slice(-10);
+        
+        for (let element of recentMessages) {
+            const text = element.textContent?.trim().toLowerCase();
             
-            if (text === 'Hello' || text === 'hello' || text === 'Hi' || text === 'hi') {
+            if (text === 'hello' || text === 'hi' || text === 'hey') {
                 console.log('💬 Found message:', text);
                 
-                // Check if this is our own message (sent by us)
-                if (isOurMessage(element) && text !== lastProcessedMessage) {
-                    console.log('🎯 This is our Hello message! Sending auto-reply...');
-                    lastProcessedMessage = text;
+                if (isOurMessage(element)) {
+                    console.log('🎯 This is OUR message! Sending auto-reply...');
                     sendAutoReply();
                     return;
                 }
@@ -107,129 +121,189 @@
         }
     }
     
-    // Check if message is sent by us
+    // Check if message is from us (multiple methods)
     function isOurMessage(element) {
         let parent = element;
-        for (let i = 0; i < 15; i++) {
+        
+        // Check up to 20 parent levels
+        for (let i = 0; i < 20; i++) {
             if (!parent) break;
             
-            const style = window.getComputedStyle(parent);
-            const classes = parent.className || '';
+            const computedStyle = window.getComputedStyle(parent);
+            const classList = Array.from(parent.classList || []);
             
-            // Multiple checks for outgoing messages
-            if (style.justifyContent === 'flex-end' ||
-                style.marginLeft === 'auto' ||
-                style.textAlign === 'right' ||
-                classes.includes('outgoing') ||
-                parent.querySelector('[data-testid*="outgoing"]') ||
-                parent.style.marginLeft && parent.style.marginLeft !== '0px') {
+            // Multiple indicators for our messages
+            if (
+                computedStyle.justifyContent === 'flex-end' ||
+                computedStyle.marginLeft === 'auto' ||
+                computedStyle.textAlign === 'right' ||
+                parent.style.marginLeft && parent.style.marginLeft !== '0px' ||
+                classList.some(cls => cls.includes('right') || cls.includes('end') || cls.includes('sent')) ||
+                parent.querySelector('[aria-label*="You sent"]') ||
+                parent.querySelector('[data-testid*="outgoing"]')
+            ) {
                 return true;
             }
             
             parent = parent.parentElement;
         }
+        
         return false;
     }
     
-    // Send automatic reply
+    // Send automatic reply with multiple fallback methods
     function sendAutoReply() {
-        console.log('📤 Sending automatic reply...');
+        if (isProcessing) return;
+        isProcessing = true;
+        
+        console.log('📤 Starting auto-reply process...');
+        showStatus('📝 TYPING MESSAGE...');
         
         setTimeout(() => {
-            const messageInput = findMessageInput();
-            if (messageInput) {
-                console.log('✅ Found message input, typing message...');
-                
-                // Clear and set message
-                messageInput.focus();
-                messageInput.click();
-                
-                if (messageInput.tagName === 'TEXTAREA') {
-                    messageInput.value = personalMessage;
-                } else {
-                    messageInput.textContent = personalMessage;
-                    messageInput.innerHTML = personalMessage;
-                }
-                
-                // Trigger input events
-                messageInput.dispatchEvent(new Event('input', { bubbles: true }));
-                messageInput.dispatchEvent(new Event('change', { bubbles: true }));
-                
-                console.log('💌 Message typed, sending...');
-                
-                // Send the message
-                setTimeout(() => {
-                    const sendButton = findSendButton();
-                    if (sendButton) {
-                        sendButton.click();
-                        messageCount++;
-                        
-                        // Store in local storage
-                        const messageData = {
-                            timestamp: Date.now(),
-                            message: personalMessage,
-                            count: messageCount
-                        };
-                        
-                        chrome.storage.local.get(['messageHistory'], (result) => {
-                            const history = result.messageHistory || [];
-                            history.push(messageData);
-                            chrome.storage.local.set({ 
-                                messageHistory: history,
-                                totalMessagesSent: messageCount 
-                            });
-                        });
-                        
-                        console.log('🎉 AUTO-REPLY SENT SUCCESSFULLY!');
-                        showSuccessNotification();
-                    } else {
-                        console.error('❌ Send button not found');
-                    }
-                }, 1000);
+            const input = findMessageInput();
+            if (input) {
+                console.log('✅ Input found, typing message...');
+                typeMessage(input);
             } else {
-                console.error('❌ Message input not found');
+                console.error('❌ No input found');
+                isProcessing = false;
             }
-        }, 2000);
+        }, 1500);
     }
     
-    // Find message input
+    // Find message input with multiple methods
     function findMessageInput() {
-        const selectors = [
+        const inputSelectors = [
             'div[contenteditable="true"][role="textbox"]',
             'textarea[placeholder*="message" i]',
             'div[contenteditable="true"][aria-label*="message" i]',
-            '[data-testid="message-input"]'
+            'div[contenteditable="true"][data-testid*="message"]',
+            'div[contenteditable="true"]',
+            'textarea',
+            '[role="textbox"]'
         ];
         
-        for (const selector of selectors) {
-            const element = document.querySelector(selector);
-            if (element && element.offsetParent !== null) {
-                return element;
+        for (let selector of inputSelectors) {
+            const elements = document.querySelectorAll(selector);
+            for (let element of elements) {
+                if (element.offsetParent !== null && !element.disabled) {
+                    return element;
+                }
             }
         }
         
         return null;
     }
     
-    // Find send button
+    // Type message with multiple methods
+    function typeMessage(input) {
+        try {
+            // Method 1: Focus and clear
+            input.focus();
+            input.click();
+            
+            // Method 2: Set value/content
+            if (input.tagName === 'TEXTAREA') {
+                input.value = personalMessage;
+            } else {
+                input.textContent = personalMessage;
+                input.innerHTML = personalMessage;
+            }
+            
+            // Method 3: Dispatch events
+            const events = ['input', 'change', 'keyup', 'paste'];
+            events.forEach(eventType => {
+                input.dispatchEvent(new Event(eventType, { bubbles: true }));
+                input.dispatchEvent(new InputEvent(eventType, { bubbles: true, data: personalMessage }));
+            });
+            
+            console.log('💌 Message typed successfully');
+            showStatus('📤 SENDING MESSAGE...');
+            
+            // Send after delay
+            setTimeout(() => sendMessage(), 1000);
+            
+        } catch (error) {
+            console.error('❌ Error typing message:', error);
+            isProcessing = false;
+        }
+    }
+    
+    // Send message with multiple methods
+    function sendMessage() {
+        try {
+            const sendButton = findSendButton();
+            
+            if (sendButton) {
+                sendButton.click();
+                messagesSent++;
+                
+                // Store in local storage
+                const messageData = {
+                    timestamp: Date.now(),
+                    message: personalMessage,
+                    count: messagesSent
+                };
+                
+                chrome.storage.local.get(['messageHistory', 'totalMessagesSent'], (result) => {
+                    const history = result.messageHistory || [];
+                    history.push(messageData);
+                    chrome.storage.local.set({
+                        messageHistory: history,
+                        totalMessagesSent: messagesSent
+                    });
+                });
+                
+                console.log('🎉 MESSAGE SENT SUCCESSFULLY!');
+                showStatus('✅ MESSAGE SENT!');
+                
+            } else {
+                // Fallback: Try Enter key
+                const input = findMessageInput();
+                if (input) {
+                    input.dispatchEvent(new KeyboardEvent('keydown', {
+                        key: 'Enter',
+                        code: 'Enter',
+                        which: 13,
+                        keyCode: 13,
+                        bubbles: true
+                    }));
+                }
+                console.log('🔄 Tried sending with Enter key');
+            }
+            
+        } catch (error) {
+            console.error('❌ Error sending message:', error);
+        } finally {
+            isProcessing = false;
+        }
+    }
+    
+    // Find send button with multiple methods
     function findSendButton() {
-        const selectors = [
+        const buttonSelectors = [
             'button[type="submit"]',
             'button[aria-label*="send" i]',
-            '[role="button"][aria-label*="send" i]'
+            'button[aria-label*="Send" i]',
+            '[role="button"][aria-label*="send" i]',
+            'button:contains("Send")',
+            'div[role="button"][aria-label*="Send"]'
         ];
         
-        for (const selector of selectors) {
-            const element = document.querySelector(selector);
-            if (element && element.offsetParent !== null) {
-                return element;
+        for (let selector of buttonSelectors) {
+            const elements = document.querySelectorAll(selector);
+            for (let element of elements) {
+                if (element.offsetParent !== null && !element.disabled) {
+                    return element;
+                }
             }
         }
         
-        // Fallback: find any button with Send text
-        const buttons = document.querySelectorAll('button');
-        for (const button of buttons) {
-            if (button.textContent?.toLowerCase().includes('send') && button.offsetParent !== null) {
+        // Fallback: Find buttons with "Send" text
+        const allButtons = document.querySelectorAll('button, div[role="button"]');
+        for (let button of allButtons) {
+            if (button.textContent?.toLowerCase().includes('send') && 
+                button.offsetParent !== null) {
                 return button;
             }
         }
@@ -237,58 +311,32 @@
         return null;
     }
     
-    // Show success notification
-    function showSuccessNotification() {
-        const notification = document.createElement('div');
-        notification.innerHTML = '✅ AUTO-REPLY SENT!';
-        notification.style.cssText = `
-            position: fixed !important;
-            top: 80px !important;
-            right: 20px !important;
-            background: #4CAF50 !important;
-            color: white !important;
-            padding: 12px 20px !important;
-            border-radius: 25px !important;
-            font-weight: bold !important;
-            font-size: 14px !important;
-            z-index: 999999 !important;
-            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4) !important;
-        `;
-        
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.remove();
-            }
-        }, 4000);
-    }
-    
     // Listen for settings updates
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (request.action === 'settingsUpdated') {
             loadSettings();
+            showStatus('⚙️ SETTINGS UPDATED');
         }
         sendResponse({ status: 'received' });
     });
     
-    // Initialize when DOM is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
-    }
-    
-    // Re-initialize on Instagram navigation
+    // Monitor URL changes
     let currentUrl = window.location.href;
     setInterval(() => {
         if (window.location.href !== currentUrl) {
             currentUrl = window.location.href;
-            if (currentUrl.includes('/direct/')) {
-                console.log('🔄 Instagram navigation detected, re-initializing...');
-                setTimeout(init, 3000);
-            }
+            console.log('🔄 URL changed, reinitializing...');
+            setTimeout(init, 2000);
         }
-    }, 2000);
+    }, 1000);
+    
+    // Initialize when ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        setTimeout(init, 1000);
+    }
+    
+    console.log('🚀 BULLETPROOF Extension loaded and ready!');
     
 })();
