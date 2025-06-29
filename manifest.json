@@ -1,34 +1,43 @@
 
 {
   "manifest_version": 3,
-  "name": "Instagram Hello Automator",
-  "version": "1.0.0",
-  "description": "Automatically sends your personal description when you send 'Hello' on Instagram",
+  "name": "Instagram Hello Automator - Always Active",
+  "version": "2.0.0",
+  "description": "Automatically sends your personal description when you send 'Hello' on Instagram - Always Active Mode",
   "permissions": [
     "storage",
     "activeTab",
-    "scripting"
+    "scripting",
+    "tabs"
   ],
   "host_permissions": [
     "*://*.instagram.com/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "content_scripts": [
     {
       "matches": ["*://*.instagram.com/*"],
       "js": ["content.js"],
-      "run_at": "document_end"
+      "run_at": "document_end",
+      "all_frames": false
     }
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Instagram Hello Automator"
+    "default_title": "Instagram Hello Automator - Always Active"
   },
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*"],
+      "matches": ["*://*.instagram.com/*"]
+    }
+  ]
 }

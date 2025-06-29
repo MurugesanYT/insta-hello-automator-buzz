@@ -11,47 +11,129 @@
     }
 
     body {
-      width: 380px;
-      height: 500px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      width: 420px;
+      height: 600px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+      background: linear-gradient(145deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
       color: white;
-      overflow: hidden;
+      overflow-y: auto;
+      position: relative;
     }
 
     .container {
-      padding: 20px;
+      padding: 24px;
       height: 100%;
       display: flex;
       flex-direction: column;
+      position: relative;
+    }
+
+    .status-indicator {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 12px;
+      height: 12px;
+      background: #4CAF50;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+      box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4);
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4); }
+      70% { box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
     }
 
     .header {
       text-align: center;
-      margin-bottom: 25px;
+      margin-bottom: 24px;
     }
 
     .logo {
-      width: 48px;
-      height: 48px;
-      background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);
-      border-radius: 12px;
-      margin: 0 auto 15px;
+      width: 56px;
+      height: 56px;
+      background: linear-gradient(135deg, #ff6b6b, #ee5a24, #ff9ff3);
+      border-radius: 16px;
+      margin: 0 auto 16px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 24px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      font-size: 28px;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.25);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .logo::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+      animation: shine 3s infinite;
+    }
+
+    @keyframes shine {
+      0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+      100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
     }
 
     .title {
-      font-size: 22px;
-      font-weight: 600;
-      margin-bottom: 5px;
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      background: linear-gradient(45deg, #fff, #f0f0f0);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
 
     .subtitle {
       font-size: 14px;
+      opacity: 0.85;
+      margin-bottom: 8px;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(76, 175, 80, 0.2);
+      border: 1px solid rgba(76, 175, 80, 0.3);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      padding: 16px;
+      border: 1px solid rgba(255,255,255,0.2);
+      text-align: center;
+    }
+
+    .stat-number {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: #FFD700;
+    }
+
+    .stat-label {
+      font-size: 12px;
       opacity: 0.8;
     }
 
@@ -60,25 +142,34 @@
     }
 
     .label {
-      display: block;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       font-size: 14px;
-      font-weight: 500;
-      margin-bottom: 8px;
-      opacity: 0.9;
+      font-weight: 600;
+      margin-bottom: 10px;
+      opacity: 0.95;
+    }
+
+    .character-count {
+      font-size: 12px;
+      opacity: 0.7;
     }
 
     .textarea {
       width: 100%;
-      height: 120px;
-      padding: 12px;
+      height: 140px;
+      padding: 16px;
       border: none;
-      border-radius: 8px;
-      background: rgba(255,255,255,0.1);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.12);
       color: white;
       font-size: 14px;
+      line-height: 1.5;
       resize: none;
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255,255,255,0.2);
+      backdrop-filter: blur(15px);
+      border: 2px solid rgba(255,255,255,0.1);
+      transition: all 0.3s ease;
     }
 
     .textarea::placeholder {
@@ -87,103 +178,106 @@
 
     .textarea:focus {
       outline: none;
-      border-color: rgba(255,255,255,0.4);
-      background: rgba(255,255,255,0.15);
+      border-color: rgba(255,255,255,0.3);
+      background: rgba(255,255,255,0.18);
+      box-shadow: 0 0 0 4px rgba(255,255,255,0.1);
     }
 
-    .toggle-group {
+    .settings-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 20px;
+      padding: 16px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 12px;
+      margin-bottom: 16px;
+      border: 1px solid rgba(255,255,255,0.1);
     }
 
-    .toggle-label {
+    .settings-label {
       font-size: 14px;
       font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
-    .toggle {
-      position: relative;
-      width: 50px;
-      height: 26px;
-      background: rgba(255,255,255,0.2);
-      border-radius: 13px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-    }
-
-    .toggle.active {
-      background: #4CAF50;
-    }
-
-    .toggle-slider {
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 22px;
-      height: 22px;
-      background: white;
-      border-radius: 50%;
-      transition: all 0.3s ease;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }
-
-    .toggle.active .toggle-slider {
-      transform: translateX(24px);
-    }
-
-    .delay-group {
-      margin-bottom: 20px;
+    .auto-enabled {
+      background: rgba(76, 175, 80, 0.2);
+      border: 1px solid rgba(76, 175, 80, 0.3);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #4CAF50;
     }
 
     .delay-input {
       width: 80px;
       padding: 8px 12px;
       border: none;
-      border-radius: 6px;
-      background: rgba(255,255,255,0.1);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.12);
       color: white;
       font-size: 14px;
       border: 1px solid rgba(255,255,255,0.2);
+      text-align: center;
     }
 
     .delay-input:focus {
       outline: none;
       border-color: rgba(255,255,255,0.4);
-      background: rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.18);
     }
 
     .save-btn {
       width: 100%;
-      padding: 12px;
-      background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+      padding: 16px;
+      background: linear-gradient(135deg, #ff6b6b, #ee5a24);
       border: none;
-      border-radius: 8px;
+      border-radius: 12px;
       color: white;
       font-size: 16px;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
       transition: all 0.3s ease;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.2);
       margin-top: auto;
+      position: relative;
+      overflow: hidden;
     }
 
     .save-btn:hover {
       transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+      box-shadow: 0 12px 35px rgba(0,0,0,0.3);
     }
 
     .save-btn:active {
       transform: translateY(0);
     }
 
+    .save-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: left 0.5s;
+    }
+
+    .save-btn:hover::before {
+      left: 100%;
+    }
+
     .status {
       text-align: center;
-      padding: 8px;
-      border-radius: 6px;
-      font-size: 12px;
-      margin-bottom: 15px;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 16px;
       opacity: 0;
       transition: opacity 0.3s ease;
     }
@@ -193,54 +287,108 @@
     }
 
     .status.success {
-      background: rgba(76, 175, 80, 0.2);
-      border: 1px solid rgba(76, 175, 80, 0.3);
+      background: rgba(76, 175, 80, 0.25);
+      border: 1px solid rgba(76, 175, 80, 0.4);
+      color: #90EE90;
     }
 
-    .delay-label {
+    .history-section {
+      background: rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .history-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
       display: flex;
       align-items: center;
-      gap: 10px;
-      font-size: 14px;
+      gap: 8px;
+    }
+
+    .history-item {
+      font-size: 12px;
+      opacity: 0.8;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .history-item:last-child {
+      border-bottom: none;
+    }
+
+    .timestamp {
+      color: #FFD700;
       font-weight: 500;
-      margin-bottom: 8px;
     }
   </style>
 </head>
 <body>
   <div class="container">
+    <div class="status-indicator" title="Always Active"></div>
+    
     <div class="header">
-      <div class="logo">📱</div>
-      <div class="title">Instagram Hello Automator</div>
-      <div class="subtitle">Automatically send your intro after "Hello"</div>
+      <div class="logo">🤖</div>
+      <div class="title">Instagram Auto-Reply</div>
+      <div class="subtitle">Always active • Smart detection</div>
+      <div class="status-badge">
+        <span>●</span> ALWAYS ON
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-number" id="totalMessages">0</div>
+        <div class="stat-label">Messages Sent</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="todayMessages">0</div>
+        <div class="stat-label">Today</div>
+      </div>
     </div>
 
     <div class="status" id="status"></div>
 
     <div class="form-group">
-      <label class="label">Your Personal Description:</label>
+      <div class="label">
+        <span>Your Auto-Reply Message:</span>
+        <span class="character-count" id="charCount">0/500</span>
+      </div>
       <textarea 
         class="textarea" 
         id="personalDescription" 
-        placeholder="Enter the message you want to send automatically after you type 'Hello'..."
+        placeholder="Enter your personalized message that will be sent automatically after you type 'Hello'..."
+        maxlength="500"
       ></textarea>
     </div>
 
-    <div class="toggle-group">
-      <span class="toggle-label">Enable Automation</span>
-      <div class="toggle" id="enableToggle">
-        <div class="toggle-slider"></div>
+    <div class="settings-row">
+      <div class="settings-label">
+        ⚡ Auto-Send Status
+      </div>
+      <div class="auto-enabled">ALWAYS ENABLED</div>
+    </div>
+
+    <div class="settings-row">
+      <div class="settings-label">
+        ⏱️ Send Delay (seconds)
+      </div>
+      <input type="number" class="delay-input" id="delayInput" min="1" max="10" value="2">
+    </div>
+
+    <div class="history-section">
+      <div class="history-title">
+        📊 Recent Activity
+      </div>
+      <div id="recentHistory">
+        <div class="history-item">Ready to send auto-replies!</div>
       </div>
     </div>
 
-    <div class="delay-group">
-      <div class="delay-label">
-        <span>Delay (seconds):</span>
-        <input type="number" class="delay-input" id="delayInput" min="1" max="30" value="2">
-      </div>
-    </div>
-
-    <button class="save-btn" id="saveBtn">Save Settings</button>
+    <button class="save-btn" id="saveBtn">💾 Save Settings</button>
   </div>
 
   <script src="popup.js"></script>
