@@ -1,41 +1,53 @@
+
 // Background script for Instagram Hello Automator - Always On Version
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('Instagram Hello Automator installed - Always On Mode');
+  console.log('🚀 Instagram Hello Automator installed - Always On Mode');
   
   // Set extension to always be enabled
   chrome.storage.local.get(['personalDescription', 'isEnabled', 'messageHistory'], (result) => {
     const defaultSettings = {
       personalDescription: result.personalDescription || "Hi! I'm excited to connect with you. I'm passionate about building meaningful connections and would love to learn more about what you do. Looking forward to our conversation!",
-      isEnabled: true, // Always enabled
+      isEnabled: true,
       delay: 2000,
       messageHistory: result.messageHistory || [],
       totalMessagesSent: result.totalMessagesSent || 0,
       lastActive: Date.now()
     };
     
-    chrome.storage.local.set(defaultSettings);
+    chrome.storage.local.set(defaultSettings, () => {
+      console.log('✅ Default settings initialized');
+    });
   });
 });
 
 // Listen for messages from content script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  console.log('📨 Background received message:', request);
+  
   if (request.action === 'helloDetected') {
-    console.log('Hello message detected on Instagram - Auto-sending response');
+    console.log('🎯 Hello message detected - Processing auto-response...');
     
     // Get user configuration
     chrome.storage.local.get(['personalDescription', 'delay', 'messageHistory', 'totalMessagesSent'], (result) => {
-      // Always send since extension is always enabled
+      const message = result.personalDescription || "Hi! I'm excited to connect with you!";
+      const delay = result.delay || 2000;
+      
+      console.log('⚡ Sending follow-up message after', delay, 'ms delay');
+      console.log('💌 Message:', message);
+      
       setTimeout(() => {
         chrome.tabs.sendMessage(sender.tab.id, {
           action: 'sendFollowUp',
-          message: result.personalDescription
+          message: message
+        }, (response) => {
+          console.log('📨 Content script response:', response);
         });
         
         // Store message history
         const newHistory = {
           timestamp: Date.now(),
-          recipient: request.recipient || 'Unknown',
-          message: result.personalDescription,
+          recipient: request.recipient || 'Unknown User',
+          message: message,
           url: sender.tab.url
         };
         
@@ -51,21 +63,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           messageHistory: updatedHistory,
           totalMessagesSent: updatedTotal,
           lastActive: Date.now()
+        }, () => {
+          console.log('💾 Message history updated. Total sent:', updatedTotal);
         });
         
-      }, result.delay || 2000);
+      }, delay);
     });
   }
   
   if (request.action === 'getStats') {
     chrome.storage.local.get(['messageHistory', 'totalMessagesSent', 'lastActive'], (result) => {
-      sendResponse({
+      const stats = {
         totalMessages: result.totalMessagesSent || 0,
         recentMessages: (result.messageHistory || []).slice(-10),
         lastActive: result.lastActive
-      });
+      };
+      console.log('📊 Sending stats:', stats);
+      sendResponse(stats);
     });
-    return true; // Keep message channel open for async response
+    return true;
   }
   
   sendResponse({status: 'received'});
@@ -74,11 +90,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Auto-activate on Instagram tabs
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' && tab.url?.includes('instagram.com')) {
-    chrome.tabs.sendMessage(tabId, {
-      action: 'extensionActive',
-      timestamp: Date.now()
-    }).catch(() => {
-      // Ignore errors for tabs that don't have content script
-    });
+    console.log('🔄 Instagram tab loaded, activating extension...');
+    
+    setTimeout(() => {
+      chrome.tabs.sendMessage(tabId, {
+        action: 'extensionActive',
+        timestamp: Date.now()
+      }).catch((error) => {
+        console.log('⚠️ Could not reach content script:', error.message);
+      });
+    }, 3000);
   }
+});
+
+// Inject content script into existing Instagram tabs on startup
+chrome.runtime.onStartup.addListener(() => {
+  chrome.tabs.query({url: "*://*.instagram.com/*"}, (tabs) => {
+    tabs.forEach(tab => {
+      chrome.scripting.executeScript({
+        target: {tabId: tab.id},
+        files: ['content.js']
+      }).catch(() => {
+        // Ignore errors for tabs that can't be scripted
+      });
+    });
+  });
 });

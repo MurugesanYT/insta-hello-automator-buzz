@@ -7,11 +7,16 @@ class InstagramAutomator {
     this.messageObserver = null;
     this.currentRecipient = '';
     this.processedMessages = new Set();
+    this.personalDescription = '';
+    this.delay = 2000;
     this.init();
   }
 
-  init() {
-    console.log('Instagram Hello Automator: Always Active Mode Loaded');
+  async init() {
+    console.log('🚀 Instagram Hello Automator: INITIALIZING...');
+    
+    // Load settings first
+    await this.loadSettings();
     
     // Start monitoring immediately
     this.startMonitoring();
@@ -21,19 +26,36 @@ class InstagramAutomator {
 
     // Listen for messages from background script
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      console.log('📨 Message received:', request);
+      
       if (request.action === 'sendFollowUp') {
+        console.log('⚡ Sending follow-up message:', request.message);
         this.sendAutomaticMessage(request.message);
       }
       if (request.action === 'extensionActive') {
-        console.log('Extension confirmed active on Instagram');
+        console.log('✅ Extension confirmed active on Instagram');
         this.startMonitoring();
+      }
+      if (request.action === 'settingsUpdated') {
+        this.loadSettings();
       }
       sendResponse({status: 'received'});
     });
   }
 
+  async loadSettings() {
+    return new Promise((resolve) => {
+      chrome.storage.local.get(['personalDescription', 'delay'], (result) => {
+        this.personalDescription = result.personalDescription || "Hi! I'm excited to connect with you!";
+        this.delay = result.delay || 2000;
+        console.log('⚙️ Settings loaded:', { personalDescription: this.personalDescription, delay: this.delay });
+        resolve();
+      });
+    });
+  }
+
   startMonitoring() {
-    console.log('Instagram Auto-Monitor: ACTIVE');
+    console.log('👀 Instagram Auto-Monitor: STARTING...');
     
     // Clear existing observers
     if (this.messageObserver) {
@@ -44,7 +66,38 @@ class InstagramAutomator {
     setTimeout(() => {
       this.observeMessageSending();
       this.detectCurrentRecipient();
-    }, 2000);
+      this.addVisualIndicator();
+    }, 3000);
+  }
+
+  addVisualIndicator() {
+    // Add a visual indicator that the extension is active
+    if (document.getElementById('ig-automator-indicator')) return;
+    
+    const indicator = document.createElement('div');
+    indicator.id = 'ig-automator-indicator';
+    indicator.style.cssText = `
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: #00ff00;
+      color: #000;
+      padding: 5px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: bold;
+      z-index: 9999;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    `;
+    indicator.textContent = '🤖 Auto-Reply Active';
+    document.body.appendChild(indicator);
+    
+    // Remove after 5 seconds
+    setTimeout(() => {
+      if (indicator.parentNode) {
+        indicator.parentNode.removeChild(indicator);
+      }
+    }, 5000);
   }
 
   detectCurrentRecipient() {
@@ -55,181 +108,223 @@ class InstagramAutomator {
     }
     
     // Try to get name from header
-    const headerName = document.querySelector('header h1, [role="banner"] h1');
+    const headerName = document.querySelector('header h1, [role="banner"] h1, [data-testid="conversation-header"] span');
     if (headerName) {
       this.currentRecipient = headerName.textContent.trim();
     }
+    
+    console.log('👤 Current recipient:', this.currentRecipient);
   }
 
   observeMessageSending() {
-    // Monitor the entire message thread area
-    const messageThreads = document.querySelectorAll('[role="main"], [data-testid="message-thread"]');
+    console.log('🔍 Setting up message observers...');
     
-    messageThreads.forEach(thread => {
-      const observer = new MutationObserver((mutations) => {
-        mutations.forEach(mutation => {
-          if (mutation.type === 'childList') {
-            mutation.addedNodes.forEach(node => {
-              if (node.nodeType === Node.ELEMENT_NODE) {
-                // Check immediately and after a short delay for dynamic content
-                this.checkForHelloMessage(node);
-                setTimeout(() => this.checkForHelloMessage(node), 500);
-              }
-            });
-          }
-        });
+    // Monitor the entire document for new messages
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach(mutation => {
+        if (mutation.type === 'childList') {
+          mutation.addedNodes.forEach(node => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              // Check for new messages
+              setTimeout(() => this.scanForHelloMessages(), 1000);
+            }
+          });
+        }
       });
-
-      observer.observe(thread, {
-        childList: true,
-        subtree: true
-      });
-      
-      this.messageObserver = observer;
     });
 
-    // Also monitor send button clicks with enhanced detection
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+    
+    this.messageObserver = observer;
+
+    // Also monitor send button clicks and Enter key
+    this.monitorUserActions();
+    
+    // Scan existing messages
+    setTimeout(() => this.scanForHelloMessages(), 2000);
+  }
+
+  monitorUserActions() {
+    // Monitor any click events on send buttons
     document.addEventListener('click', (event) => {
       const target = event.target;
-      const sendButton = target.closest('button[type="submit"], button[aria-label*="Send"], [role="button"]');
+      const sendButton = target.closest('button, [role="button"]');
       
-      if (sendButton && (sendButton.textContent.includes('Send') || sendButton.getAttribute('aria-label')?.includes('Send'))) {
-        console.log('Send button clicked - checking for Hello message');
+      if (sendButton && this.isSendButton(sendButton)) {
+        console.log('📤 Send button clicked - scanning for Hello...');
         setTimeout(() => {
-          this.checkRecentMessages();
+          this.scanForHelloMessages();
           this.detectCurrentRecipient();
-        }, 800);
+        }, 1500);
       }
-    });
+    }, true);
 
-    // Monitor keyboard send (Enter key)
+    // Monitor keyboard events
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' && !event.shiftKey) {
         const activeElement = document.activeElement;
-        if (activeElement && activeElement.getAttribute('contenteditable') === 'true') {
+        if (this.isMessageInput(activeElement)) {
+          console.log('⌨️ Enter pressed in message input - scanning for Hello...');
           setTimeout(() => {
-            this.checkRecentMessages();
+            this.scanForHelloMessages();
             this.detectCurrentRecipient();
-          }, 800);
+          }, 1500);
         }
       }
-    });
+    }, true);
   }
 
-  checkRecentMessages() {
-    // Enhanced message detection with multiple selectors
+  isSendButton(element) {
+    const text = element.textContent?.toLowerCase() || '';
+    const ariaLabel = element.getAttribute('aria-label')?.toLowerCase() || '';
+    
+    return text.includes('send') || 
+           ariaLabel.includes('send') || 
+           element.querySelector('svg[aria-label*="Send"]') !== null;
+  }
+
+  isMessageInput(element) {
+    if (!element) return false;
+    
+    const ariaLabel = element.getAttribute('aria-label')?.toLowerCase() || '';
+    const placeholder = element.getAttribute('placeholder')?.toLowerCase() || '';
+    const contentEditable = element.getAttribute('contenteditable') === 'true';
+    
+    return contentEditable && 
+           (ariaLabel.includes('message') || placeholder.includes('message')) ||
+           element.tagName === 'TEXTAREA' && placeholder.includes('message');
+  }
+
+  scanForHelloMessages() {
+    console.log('🔎 Scanning for Hello messages...');
+    
+    // Multiple selectors for Instagram messages
     const messageSelectors = [
       '[data-testid="message-text"]',
-      '[dir="auto"]',
-      '.x1lliihq', // Instagram's text class
+      '[dir="auto"]:not([role="textbox"])',
+      'div[dir="auto"]:not([contenteditable])',
       '[role="listitem"] div[dir="auto"]',
-      'div[data-testid*="message"] div[dir="auto"]'
+      'span[dir="auto"]'
     ];
 
-    let allMessages = [];
+    let foundMessages = [];
+    
     messageSelectors.forEach(selector => {
       const messages = document.querySelectorAll(selector);
-      allMessages = [...allMessages, ...Array.from(messages)];
+      foundMessages = [...foundMessages, ...Array.from(messages)];
     });
 
-    // Get the most recent messages
-    const recentMessages = allMessages.slice(-8);
+    console.log(`📋 Found ${foundMessages.length} potential message elements`);
+
+    // Check the most recent messages first
+    const recentMessages = foundMessages.slice(-20);
     
-    recentMessages.forEach(messageElement => {
+    for (let i = recentMessages.length - 1; i >= 0; i--) {
+      const messageElement = recentMessages[i];
       const messageText = messageElement.textContent?.trim();
-      const messageId = this.generateMessageId(messageElement);
       
-      if (messageText === 'Hello' && 
-          this.isUserMessage(messageElement) && 
-          !this.processedMessages.has(messageId)) {
+      console.log(`💬 Checking message: "${messageText}"`);
+      
+      if (messageText === 'Hello') {
+        const messageId = this.generateMessageId(messageElement);
         
-        console.log('✓ Hello message detected from user - Triggering auto-response');
-        this.processedMessages.add(messageId);
-        this.handleHelloMessage();
+        if (this.isUserMessage(messageElement) && !this.processedMessages.has(messageId)) {
+          console.log('🎯 HELLO MESSAGE DETECTED FROM USER! Processing...');
+          this.processedMessages.add(messageId);
+          this.handleHelloMessage();
+          return; // Only process one at a time
+        }
       }
-    });
+    }
   }
 
   generateMessageId(element) {
-    // Create unique ID for message to prevent duplicate processing
     const text = element.textContent?.trim();
     const timestamp = Date.now();
     const position = Array.from(element.parentNode?.children || []).indexOf(element);
-    return `${text}-${position}-${Math.floor(timestamp / 1000)}`;
-  }
-
-  checkForHelloMessage(element) {
-    const messageSelectors = [
-      '[data-testid="message-text"]',
-      '[dir="auto"]',
-      'div[dir="auto"]'
-    ];
-
-    messageSelectors.forEach(selector => {
-      const textElements = element.querySelectorAll(selector);
-      
-      textElements.forEach(textElement => {
-        const messageText = textElement.textContent?.trim();
-        const messageId = this.generateMessageId(textElement);
-        
-        if (messageText === 'Hello' && 
-            this.isUserMessage(textElement) && 
-            !this.processedMessages.has(messageId)) {
-          
-          console.log('✓ New Hello message detected - Auto-responding');
-          this.processedMessages.add(messageId);
-          this.handleHelloMessage();
-        }
-      });
-    });
+    return `${text}-${position}-${Math.floor(timestamp / 5000)}`; // 5 second window
   }
 
   isUserMessage(messageElement) {
-    // Enhanced detection for user's own messages
-    const messageContainer = messageElement.closest('[role="listitem"], [data-testid*="message"], div[class*="message"]');
-    if (!messageContainer) return false;
-
-    // Multiple indicators for sent messages
-    const indicators = [
-      messageContainer.querySelector('[style*="flex-direction: row-reverse"]'),
-      messageContainer.querySelector('[style*="justify-content: flex-end"]'),
-      messageContainer.querySelector('[aria-label*="Sent"]'),
-      messageContainer.querySelector('[title*="Sent"]'),
-      messageContainer.classList.contains('outgoing'),
-      messageContainer.querySelector('svg[aria-label*="Sent"]'),
-      // Check parent containers for alignment
-      messageContainer.parentElement?.style.justifyContent === 'flex-end',
-      messageContainer.style.marginLeft === 'auto'
-    ];
-
-    return indicators.some(indicator => indicator);
+    console.log('🔍 Checking if message is from user...');
+    
+    // Get the message container
+    let container = messageElement;
+    for (let i = 0; i < 10; i++) {
+      container = container.parentElement;
+      if (!container) break;
+      
+      // Check various indicators for sent/outgoing messages
+      const containerStyle = window.getComputedStyle(container);
+      const containerClasses = container.className || '';
+      
+      // Multiple ways to detect user's own messages
+      const indicators = [
+        containerStyle.justifyContent === 'flex-end',
+        containerStyle.marginLeft === 'auto',
+        containerStyle.textAlign === 'right',
+        containerClasses.includes('outgoing'),
+        container.querySelector('[aria-label*="Sent"]') !== null,
+        container.querySelector('svg[aria-label*="Sent"]') !== null,
+        // Check if message is on the right side
+        container.style.marginLeft && container.style.marginLeft !== '0px',
+        // Check for specific Instagram classes or attributes
+        container.querySelector('[data-testid*="outgoing"]') !== null
+      ];
+      
+      const isUserMsg = indicators.some(indicator => indicator);
+      if (isUserMsg) {
+        console.log('✅ Confirmed: This is a user message');
+        return true;
+      }
+    }
+    
+    console.log('❌ This appears to be a received message');
+    return false;
   }
 
   handleHelloMessage() {
-    console.log('🚀 Sending Hello detection to background script');
+    console.log('🚀 Processing Hello message - sending to background script...');
     
     chrome.runtime.sendMessage({
       action: 'helloDetected',
       timestamp: Date.now(),
       recipient: this.currentRecipient,
       url: window.location.href
+    }, (response) => {
+      console.log('📨 Background script response:', response);
     });
   }
 
   async sendAutomaticMessage(message) {
-    console.log('📤 Sending automatic follow-up message...');
+    console.log('📤 Starting automatic message send process...');
+    console.log('💌 Message to send:', message);
     
     const messageInput = this.findMessageInput();
     if (!messageInput) {
-      console.log('❌ Message input not found');
+      console.error('❌ Message input not found!');
       return;
     }
 
-    // Enhanced message input handling
+    console.log('✅ Message input found:', messageInput);
+
+    // Focus and clear the input
     messageInput.focus();
     messageInput.click();
     
-    // Clear and set message with multiple methods
+    // Clear existing content
+    if (messageInput.value !== undefined) {
+      messageInput.value = '';
+    }
+    if (messageInput.textContent !== undefined) {
+      messageInput.textContent = '';
+      messageInput.innerHTML = '';
+    }
+
+    // Set the message
     if (messageInput.tagName === 'TEXTAREA' || messageInput.tagName === 'INPUT') {
       messageInput.value = message;
     } else {
@@ -237,88 +332,105 @@ class InstagramAutomator {
       messageInput.innerHTML = message;
     }
 
-    // Trigger all possible events
-    ['input', 'change', 'keyup', 'paste'].forEach(eventType => {
-      messageInput.dispatchEvent(new Event(eventType, { bubbles: true }));
+    // Trigger events to make Instagram recognize the input
+    const events = ['input', 'change', 'keyup', 'keydown', 'paste'];
+    events.forEach(eventType => {
+      const event = new Event(eventType, { bubbles: true, cancelable: true });
+      messageInput.dispatchEvent(event);
     });
 
-    // Send the message
+    console.log('⚡ Message set, waiting before sending...');
+    
+    // Wait and then send
     setTimeout(() => {
-      this.sendMessage();
-    }, 1200);
+      this.clickSendButton();
+    }, 1500);
   }
 
   findMessageInput() {
-    // Comprehensive selectors for Instagram message input
+    console.log('🔍 Looking for message input...');
+    
     const selectors = [
       '[aria-label*="Message"]',
       '[placeholder*="Message"]',
       '[contenteditable="true"][role="textbox"]',
-      'div[contenteditable="true"][data-testid*="message"]',
+      'div[contenteditable="true"][aria-label*="Message"]',
       'textarea[placeholder*="Message"]',
       '[data-testid="message-input"]',
-      'div[contenteditable="true"]:not([data-testid*="comment"])'
+      'div[contenteditable="true"]:not([aria-label*="comment"])'
     ];
 
     for (const selector of selectors) {
-      const input = document.querySelector(selector);
-      if (input && input.offsetParent !== null) { // Check if visible
-        return input;
+      const inputs = document.querySelectorAll(selector);
+      for (const input of inputs) {
+        if (input.offsetParent !== null) { // Check if visible
+          console.log('✅ Found message input with selector:', selector);
+          return input;
+        }
       }
     }
 
+    console.log('❌ No message input found');
     return null;
   }
 
-  sendMessage() {
-    // Enhanced send button detection
+  clickSendButton() {
+    console.log('🔍 Looking for send button...');
+    
     const sendSelectors = [
       'button[type="submit"]',
       '[role="button"][aria-label*="Send"]',
-      'button:has(svg[aria-label*="Send"])',
+      'button[aria-label*="Send"]',
       '[data-testid="send-button"]',
-      'button[aria-label*="Send message"]'
+      'button:has(svg[aria-label*="Send"])'
     ];
 
     for (const selector of sendSelectors) {
       try {
-        const button = document.querySelector(selector);
-        if (button && button.offsetParent !== null) {
-          button.click();
-          console.log('✅ Automatic message sent successfully!');
-          return;
+        const buttons = document.querySelectorAll(selector);
+        for (const button of buttons) {
+          if (button.offsetParent !== null) { // Check if visible
+            console.log('✅ Found send button, clicking...');
+            button.click();
+            console.log('🎉 AUTOMATIC MESSAGE SENT SUCCESSFULLY!');
+            return;
+          }
         }
       } catch (e) {
-        console.log('Send button selector failed:', selector);
+        console.log('⚠️ Send button selector failed:', selector, e);
       }
     }
 
     // Fallback: look for any button with "Send" text
     const allButtons = document.querySelectorAll('button, [role="button"]');
     for (const button of allButtons) {
-      if (button.textContent?.includes('Send') || 
-          button.getAttribute('aria-label')?.includes('Send')) {
+      const buttonText = button.textContent?.toLowerCase() || '';
+      const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
+      
+      if ((buttonText.includes('send') || ariaLabel.includes('send')) && button.offsetParent !== null) {
+        console.log('✅ Found send button via fallback, clicking...');
         button.click();
-        console.log('✅ Automatic message sent via fallback!');
-        break;
+        console.log('🎉 AUTOMATIC MESSAGE SENT VIA FALLBACK!');
+        return;
       }
     }
+
+    console.error('❌ No send button found!');
   }
 
   observePageChanges() {
-    // Enhanced navigation monitoring for Instagram SPA
     let lastUrl = window.location.href;
     
     const observer = new MutationObserver(() => {
       if (window.location.href !== lastUrl) {
         lastUrl = window.location.href;
-        console.log('Instagram navigation detected:', lastUrl);
+        console.log('🔄 Instagram navigation detected:', lastUrl);
         
         if (window.location.href.includes('/direct/')) {
           setTimeout(() => {
             this.startMonitoring();
             this.detectCurrentRecipient();
-          }, 2000);
+          }, 3000);
         }
       }
     });
@@ -328,25 +440,24 @@ class InstagramAutomator {
       subtree: true
     });
 
-    // Also listen for popstate events
     window.addEventListener('popstate', () => {
       setTimeout(() => {
         if (window.location.href.includes('/direct/')) {
           this.startMonitoring();
         }
-      }, 1000);
+      }, 2000);
     });
   }
 }
 
-// Enhanced initialization
+// Initialize the automator
 const initializeAutomator = () => {
   if (window.instagramAutomator) {
-    return; // Already initialized
+    return;
   }
   
+  console.log('🚀 INITIALIZING INSTAGRAM HELLO AUTOMATOR...');
   window.instagramAutomator = new InstagramAutomator();
-  console.log('Instagram Hello Automator: Ready and Always Active! 🚀');
 };
 
 // Multiple initialization methods
@@ -356,9 +467,17 @@ if (document.readyState === 'loading') {
   initializeAutomator();
 }
 
-// Re-initialize on focus (in case Instagram reloads content)
+// Re-initialize on focus
 window.addEventListener('focus', () => {
   if (window.location.href.includes('instagram.com') && !window.instagramAutomator) {
-    setTimeout(initializeAutomator, 1000);
+    setTimeout(initializeAutomator, 2000);
   }
 });
+
+// Force re-initialize every 30 seconds if not working
+setInterval(() => {
+  if (window.location.href.includes('/direct/') && !window.instagramAutomator) {
+    console.log('🔄 Force re-initializing automator...');
+    initializeAutomator();
+  }
+}, 30000);
